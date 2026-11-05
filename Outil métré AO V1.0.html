@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Visionneuse PDF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #DDE1E7;
+    --desk-deep: #CBD1DA;
+    --paper: #FFFFFF;
+    --ink: #1E2533;
+    --ink-soft: #5A6475;
+    --accent: #2D5BA8;
+    --accent-ink: #FFFFFF;
+    --bar: rgba(255,255,255,0.86);
+    --line: #C3CAD4;
+    --page-shadow: 0 1px 2px rgba(30,37,51,.12), 0 6px 18px rgba(30,37,51,.10);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --desk: #1C2029; --desk-deep: #252B36; --paper: #FFFFFF;
+      --ink: #E7EAF0; --ink-soft: #9AA3B2; --accent: #7FA6EA; --accent-ink: #10151F;
+      --bar: rgba(28,32,41,.88); --line: #353C49;
+      --page-shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #1C2029; --desk-deep: #252B36; --paper: #FFFFFF;
+    --ink: #E7EAF0; --ink-soft: #9AA3B2; --accent: #7FA6EA; --accent-ink: #10151F;
+    --bar: rgba(28,32,41,.88); --line: #353C49;
+    --page-shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; min-height: 100%;
+    background: var(--desk); color: var(--ink);
+    font-family: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.5;
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Écran d'accueil */
+  .welcome {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; padding: 24px;
+  }
+  .saved { width: min(460px, 100%); }
+  .saved h2 { font-size: 1rem; font-weight: 600; margin: 0 0 8px; }
+  .saved ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .saved li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bar); }
+  .saved li + li { border-top: 1px solid var(--line); }
+  .saved .meta { flex: 1; min-width: 0; }
+  .saved .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .saved .date { font-size: .85rem; color: var(--ink-soft); }
+  .saved .resume { padding: 7px 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: pointer; }
+  .saved .forget { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; cursor: pointer; font-size: .88rem; }
+  .saved .forget.confirm { border-color: #B42318; color: #B42318; }
+  .save-state { font-size: .85rem; color: var(--ink-soft); white-space: nowrap; }
+  .save-state.dirty { color: #B45309; font-weight: 500; }
+  .save-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+    border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+    font-weight: 600; cursor: pointer;
+  }
+  .save-btn:hover { filter: brightness(1.08); }
+  /* Le bandeau principal (et ses menus) passe devant le bandeau d'outils */
+  .toolbar-main { position: relative; z-index: 2; }
+  .toolbar-edit { position: relative; z-index: 1; }
+  .home { position: relative; flex: none; }
+  .home-pop {
+    position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: 250px; padding: 12px;
+    background: #fff; color: #1E2533; border: 1px solid #C3CAD4; border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(30,37,51,.18);
+  }
+  .home-pop p { margin: 0 0 10px; font-size: .9rem; }
+  .home-pop .row { display: flex; flex-direction: column; gap: 6px; }
+  .home-pop button {
+    padding: 7px 12px; border-radius: 999px; font: inherit; font-size: .88rem; cursor: pointer;
+    border: 1px solid #C3CAD4; background: #fff; color: #1E2533;
+  }
+  .home-pop button.go { background: #2D5BA8; border-color: #2D5BA8; color: #fff; font-weight: 600; }
+  .xmenu { position: relative; }
+  .xmenu-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .xmenu-btn[aria-expanded="true"] { background: var(--desk-deep); }
+  .xmenu-panel {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 290px; padding: 6px;
+    background: #fff; color: #1E2533; border: 1px solid #C3CAD4; border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(30,37,51,.18);
+  }
+  .xmenu-panel > button {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+    padding: 9px 11px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer;
+  }
+  .xmenu-panel > button:hover, .xmenu-panel > button:focus-visible { background: #EEF1F5; outline: none; }
+  .xmenu-panel > button:disabled { opacity: .45; cursor: default; background: transparent; }
+  .xmenu-panel strong { font-size: .93rem; font-weight: 600; }
+  .xmenu-panel span { font-size: .82rem; color: #5A6475; line-height: 1.35; }
+  .xmenu-panel > button + button { margin-top: 2px; }
+  .xmenu-status {
+    margin: 6px 4px 2px; padding: 9px 10px; border-radius: 8px; background: #F3F5F8;
+    font-size: .85rem; line-height: 1.4; color: #1E2533;
+  }
+  .xmenu-status.error { background: #FDECEA; color: #8A1C12; }
+  .xmenu-status .row { display: flex; gap: 6px; margin-top: 8px; }
+  .xmenu-status button {
+    padding: 5px 12px; border-radius: 999px; font: inherit; font-size: .85rem; cursor: pointer;
+    border: 1px solid #C3CAD4; background: #fff; color: #1E2533;
+  }
+  .xmenu-status button.go { background: #2D5BA8; border-color: #2D5BA8; color: #fff; font-weight: 600; }
+  .save-btn:disabled { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); cursor: default; filter: none; }
+  .drop {
+    width: min(460px, 100%);
+    padding: 48px 32px 40px;
+    border: 2px dashed var(--line); border-radius: 18px;
+    text-align: center;
+    transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--accent); background: var(--desk-deep); }
+  .sheet {
+    width: 72px; height: 92px; margin: 0 auto 28px; position: relative;
+    background: var(--paper); border-radius: 4px; box-shadow: var(--page-shadow);
+  }
+  .sheet::before, .sheet::after {
+    content: ""; position: absolute; left: 14px; right: 14px; height: 4px;
+    border-radius: 2px; background: #D5DAE2;
+  }
+  .sheet::before { top: 22px; box-shadow: 0 12px 0 #D5DAE2, 0 24px 0 #D5DAE2; }
+  .sheet::after { top: 70px; right: 34px; }
+  .drop h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 6px; letter-spacing: -.01em; }
+  .drop p { margin: 0 0 28px; color: var(--ink-soft); }
+  .primary {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 13px 26px; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink);
+    font-weight: 600; font-size: 1rem;
+  }
+  .primary:hover { filter: brightness(1.08); }
+  .error { margin-top: 18px; color: #C0392B; font-size: .95rem; min-height: 1.5em; }
+
+  /* Barre d'outils */
+  .bars { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+  .toolbar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 16px;
+    background: var(--bar); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .filename {
+    flex: 1 1 160px; min-width: 0; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .group { display: flex; align-items: center; gap: 4px; }
+  .icon {
+    width: 36px; height: 36px; display: grid; place-items: center;
+    border: 1px solid var(--line); border-radius: 10px; background: transparent; cursor: pointer;
+  }
+  .icon:hover:not(:disabled) { background: var(--desk-deep); }
+  .icon:disabled { opacity: .4; cursor: default; }
+  .icon svg { width: 18px; height: 18px; }
+  .readout { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: .95rem; }
+  .readout input {
+    width: 3.2em; text-align: center; font: inherit; color: var(--ink);
+    background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 4px 2px;
+  }
+  .secondary {
+    padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px;
+    background: transparent; cursor: pointer; font-weight: 500;
+  }
+  .secondary:hover { background: var(--desk-deep); }
+  #addBox, #lineTD, #lineDer, #lineRJ45 { display: inline-flex; align-items: center; gap: 8px; }
+  #addBox[aria-pressed="true"], #lineTD[aria-pressed="true"], #lineDer[aria-pressed="true"], #lineRJ45[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .toolbar-edit { padding-top: 8px; padding-bottom: 8px; }
+  .sep { width: 1px; height: 26px; background: var(--line); margin: 0 4px; flex: none; }
+  .hint { font-size: .9rem; color: var(--ink-soft); }
+
+  .page { position: relative; }
+  .overlay { position: absolute; inset: 0; }
+  body.placing .overlay { cursor: crosshair; user-select: none; -webkit-user-select: none; }
+  .jbox {
+    position: absolute; transform: translate(-50%, -50%);
+    width: 26px; height: 26px; padding: 0;
+    border: 2px solid #4C1D95; border-radius: 3px;
+    background: rgba(255,255,255,.9); cursor: grab; touch-action: none;
+  }
+  .jbox::before, .jbox::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 30px; height: 2px;
+    background: #4C1D95; transform: translate(-50%,-50%) rotate(45deg);
+  }
+  .jbox::after { transform: translate(-50%,-50%) rotate(-45deg); }
+  .jbox span {
+    position: absolute; left: calc(100% + 4px); top: 50%; transform: translateY(-50%);
+    font-size: 12px; font-weight: 600; color: #4C1D95; white-space: nowrap;
+    background: rgba(255,255,255,.85); padding: 0 4px; border-radius: 3px; pointer-events: none;
+  }
+  .lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .td-line { stroke: #4C1D95; stroke-width: 2; fill: none; stroke-linejoin: round; }
+  .td-line.der, .td-preview.der { stroke: var(--c, #00B8B8); }
+  .td-end[data-kind="der"] { background: var(--c, #00B8B8); border-radius: 2px; }
+  .td-vertex[data-kind="der"] { border-color: var(--c, #00B8B8); }
+
+  /* Bouton dérivation + menu de câble rattaché */
+  .split { display: inline-flex; align-items: stretch; }
+  .split.open #lineDer { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .cable {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0 10px 0 12px; border: 1px solid var(--accent); border-left: 0;
+    border-radius: 0 999px 999px 0; background: var(--paper); color: #1E2533;
+  }
+  .cable .swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--c); flex: none; }
+  .cable select {
+    font: inherit; font-weight: 500; color: inherit; background: transparent;
+    border: 0; padding: 7px 2px; cursor: pointer;
+  }
+  .split.alim #cablePicker { border-radius: 0; }
+  #sectionPicker { padding-left: 8px; border-left: 1px solid var(--line); }
+  .end-label {
+    position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%);
+    font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--c, #7F1D1D);
+    background: rgba(255,255,255,.9); padding: 0 4px; border-radius: 3px; pointer-events: none;
+  }
+  .cable select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+  .td-preview { stroke: #4C1D95; stroke-width: 2; stroke-dasharray: 6 4; opacity: .7; }
+  .td-vertex {
+    position: absolute; width: 9px; height: 9px; background: #fff; border: 2px solid #4C1D95;
+    transform: translate(-50%, -50%); cursor: grab; touch-action: none;
+  }
+  .td-vertex::before { content: ""; position: absolute; inset: -10px; }
+  .td-vertex.dragging { cursor: grabbing; }
+  body.placing .td-vertex { pointer-events: none; }
+  .td-end {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: #4C1D95; border: 2px solid #fff; transform: translate(-50%, -50%);
+    cursor: grab; touch-action: none;
+  }
+  .td-end::before { content: ""; position: absolute; inset: -10px; border-radius: 50%; }
+  .td-end.dragging { cursor: grabbing; box-shadow: 0 0 0 4px rgba(76,29,149,.25); }
+  body.placing .td-end { pointer-events: none; }
+  .jbox.dragging { cursor: grabbing; }
+  .jbox.selected { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* Zone de lecture */
+  .viewer { padding: 28px 16px 64px; overflow-x: auto; }
+  .pages { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .page {
+    background: var(--paper); box-shadow: var(--page-shadow);
+    border-radius: 2px; max-width: none;
+  }
+  .page canvas { display: block; }
+  .loading { text-align: center; color: var(--ink-soft); padding: 40px 0; }
+
+  /* Fenêtre flottante Calcul */
+  .calc {
+    position: fixed; right: 16px; top: var(--calc-top, 130px); z-index: 6;
+    width: 270px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - var(--calc-top, 130px) - 16px - env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column;
+    background: var(--paper); color: #1E2533;
+    border: 1px solid #C3CAD4; border-radius: 14px;
+    box-shadow: 0 2px 6px rgba(30,37,51,.12), 0 12px 32px rgba(30,37,51,.16);
+  }
+  .calc > header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 10px 10px 16px; border-bottom: 1px solid #E3E7ED;
+  }
+  .calc.collapsed > header { border-bottom: 0; }
+  .calc h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+  .calc .icon { width: 30px; height: 30px; border-color: #D5DAE2; color: #1E2533; }
+  .calc .icon:hover { background: #EEF1F5; }
+  .calc-body { padding: 14px 16px 16px; overflow-y: auto; }
+  .calc.collapsed .calc-body { display: none; }
+  .calc p { margin: 0 0 12px; font-size: .92rem; color: #5A6475; line-height: 1.45; }
+  .calc .primary { padding: 9px 18px; font-size: .95rem; background: #2D5BA8; color: #fff; }
+  .calc .secondary { font-size: .88rem; padding: 6px 12px; border-color: #C3CAD4; color: #1E2533; }
+  .calc .secondary:hover { background: #EEF1F5; }
+  .measure-input { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .measure-input label { font-size: .92rem; font-weight: 500; }
+  .measure-input .row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .measure-input input {
+    width: 100%; font: inherit; padding: 7px 10px; border: 1px solid #C3CAD4; border-radius: 8px;
+    color: #1E2533; background: #fff;
+  }
+  .measure-input .actions { display: flex; gap: 8px; }
+  .calc .scale { font-size: .85rem; }
+  .calc-list { list-style: none; margin: 0 0 12px; padding: 0; }
+  .calc-list li {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 7px 0; border-bottom: 1px solid #EEF1F5; font-size: .95rem;
+  }
+  .calc-list .bd { font-weight: 600; color: #4C1D95; }
+  .calc-list .len { font-variant-numeric: tabular-nums; }
+  .calc-list .none { color: #8A93A3; font-size: .88rem; }
+  .calc-list li.total { border-bottom: 0; border-top: 1px solid #C3CAD4; font-weight: 600; margin-top: 2px; }
+  .calc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .calc .extra { display: inline-flex; align-items: center; gap: 4px; font-size: .88rem; color: #5A6475; }
+  .calc .extra input {
+    width: 4.2em; font: inherit; padding: 3px 6px; text-align: right;
+    border: 1px solid #C3CAD4; border-radius: 6px; color: #1E2533; background: #fff;
+  }
+  .rj-line { stroke: #007A33; stroke-width: 2; fill: none; stroke-linejoin: round; }
+  .rj-preview { stroke: #007A33; stroke-width: 2; stroke-dasharray: 6 4; opacity: .7; }
+  .td-end[data-kind="rj"] { background: #007A33; }
+  .td-vertex[data-kind="rj"] { border-color: #007A33; }
+  .td-end[data-kind="rj"] .end-label { color: #007A33; }
+  .mes-line { stroke: var(--c); stroke-width: 2; fill: none; stroke-dasharray: 8 5; stroke-linejoin: round; }
+  .mes-preview { stroke: var(--c); stroke-width: 2; stroke-dasharray: 3 4; opacity: .7; }
+  .td-end[data-kind="mes"] { background: var(--c); }
+  .td-vertex[data-kind="mes"] { border-color: var(--c); }
+  .td-end[data-kind="mes"] .end-label { color: var(--c); }
+  #lineRJ45, #lineMes { display: inline-flex; align-items: center; gap: 8px; }
+  #lineMes[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .split.open > .secondary { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .picker { gap: 8px; padding: 0 12px 0 8px; font-size: .88rem; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .picker input[type="color"] {
+    width: 28px; height: 28px; padding: 0; border: 1px solid #C3CAD4; border-radius: 6px;
+    background: none; cursor: pointer;
+  }
+  .picker input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .picker input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 4px; }
+  .picker input[type="color"]::-moz-color-swatch { border: 0; border-radius: 4px; }
+  .calc-sub { margin: 4px 0 4px; font-size: .9rem; font-weight: 600; color: #1E2533; }
+  .calc-list .cat { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .calc-list .cat i { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
+  .calc-empty { font-size: .9rem; color: #8A93A3; margin: 0 0 12px; }
+  .measure-line { stroke: #1E2533; stroke-width: 2; stroke-dasharray: 5 4; }
+  .measure-dot {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: #1E2533; border: 2px solid #fff; transform: translate(-50%,-50%); pointer-events: none;
+  }
+  @media (max-width: 560px) { .calc { width: 230px; } }
+
+  /* Menu contextuel */
+  .ctx {
+    position: fixed; z-index: 20; min-width: 190px; padding: 4px;
+    background: #fff; color: #1E2533; border: 1px solid #C3CAD4; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(30,37,51,.18);
+  }
+  .ctx .ctx-title { padding: 6px 10px 4px; font-size: .8rem; color: #5A6475; }
+  .ctx button {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+    color: #B42318; font-size: .92rem; font-weight: 500;
+  }
+  .ctx button:hover, .ctx button:focus-visible { background: #FDECEA; outline: none; }
+  .ctx-target { stroke-width: 5 !important; }
+  .jbox.ctx-target { outline: 2px dashed #B42318; outline-offset: 3px; }
+
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 560px) {
+    .toolbar { gap: 8px; padding: 8px 10px; }
+    .filename { flex-basis: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<main class="welcome" id="welcome">
+  <div class="drop" id="drop">
+    <div class="sheet" aria-hidden="true"></div>
+    <h1>Ouvrir un PDF</h1>
+    <p>Choisissez un fichier sur votre appareil, ou déposez-le ici.</p>
+    <button class="primary" id="pick">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M4 20h16"/></svg>
+      Importer un PDF
+    </button>
+    <div class="error" id="error" role="alert"></div>
+  </div>
+  <section class="saved" id="saved" hidden>
+    <h2>Reprendre un travail</h2>
+    <ul id="savedList"></ul>
+  </section>
+</main>
+
+<div id="app" hidden>
+  <div class="bars" id="bars">
+  <header class="toolbar toolbar-main">
+    <div class="home">
+      <button class="icon" id="homeBtn" aria-label="Revenir à l'accueil" title="Revenir à l'accueil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>
+      </button>
+      <div class="home-pop" id="homePop" role="dialog" aria-label="Quitter le document" hidden>
+        <p>Des modifications ne sont pas enregistrées.</p>
+        <div class="row">
+          <button class="go" id="homeSave">Enregistrer et quitter</button>
+          <button id="homeLeave">Quitter sans enregistrer</button>
+          <button id="homeCancel">Annuler</button>
+        </div>
+      </div>
+    </div>
+    <div class="filename" id="filename"></div>
+    <span class="save-state" id="saveState" aria-live="polite"></span>
+    <button class="save-btn" id="saveBtn" title="Enregistrer (Ctrl+S)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h8V3"/><path d="M8 21v-7h8v7"/></svg>
+      Enregistrer
+    </button>
+    <div class="xmenu" id="xmenu">
+      <button class="secondary xmenu-btn" id="xmenuBtn" aria-haspopup="true" aria-expanded="false">
+        Export/Import
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="xmenu-panel" id="xmenuPanel" role="menu" hidden>
+        <button role="menuitem" id="exportPdf">
+          <strong>Exporter le PDF annoté</strong>
+          <span>Le plan avec toutes les boîtes, lignes et mesures dessinées dessus</span>
+        </button>
+        <button role="menuitem" id="exportJson">
+          <strong>Exporter les modifications</strong>
+          <span>Un fichier .json avec uniquement les annotations</span>
+        </button>
+        <button role="menuitem" id="importJson">
+          <strong>Importer des modifications</strong>
+          <span>Recharger un fichier .json exporté sur ce plan</span>
+        </button>
+        <div class="xmenu-status" id="xStatus" role="status" hidden></div>
+      </div>
+    </div>
+    <div class="group" aria-label="Navigation">
+      <button class="icon" id="prev" aria-label="Page précédente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <span class="readout"><input id="pageInput" type="text" inputmode="numeric" aria-label="Numéro de page"> / <span id="pageCount">–</span></span>
+      <button class="icon" id="next" aria-label="Page suivante">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+    <div class="group" aria-label="Zoom">
+      <button class="icon" id="zoomOut" aria-label="Dézoomer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      </button>
+      <span class="readout" id="zoomLabel">100 %</span>
+      <button class="icon" id="zoomIn" aria-label="Zoomer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="icon" id="fit" aria-label="Ajuster à la largeur">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/></svg>
+      </button>
+    </div>
+  </header>
+  <div class="toolbar toolbar-edit" aria-label="Outils de plan">
+    <button class="secondary" id="addBox" aria-pressed="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 4l16 16M20 4 4 20"/></svg>
+      Nouvelle boîte
+    </button>
+    <button class="secondary" id="lineTD" aria-pressed="false" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><path d="M10 10l9 9"/><circle cx="19" cy="19" r="2" fill="currentColor"/></svg>
+      Ligne vers TD
+    </button>
+    <span class="split" id="derSplit" hidden>
+    <button class="secondary" id="lineDer" aria-pressed="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><path d="M10 7h6v10h5"/><path d="M16 12h5"/></svg>
+      Ligne dérivation
+    </button>
+    <label class="cable" id="cablePicker" hidden>
+      <span class="swatch" id="cableSwatch" aria-hidden="true"></span>
+      <select id="cableSelect" aria-label="Type de circuit">
+        <option value="ECL">ECL</option>
+        <option value="BAES">BAES</option>
+        <option value="PC">PC</option>
+        <option value="ALIM">ALIM</option>
+      </select>
+    </label>
+    <label class="cable" id="sectionPicker" hidden>
+      <select id="sectionSelect" aria-label="Section du câble d'alimentation">
+        <option value="3G1.5">3G1.5</option>
+        <option value="3G2.5">3G2.5</option>
+        <option value="3G6">3G6</option>
+        <option value="5G1.5">5G1.5</option>
+        <option value="5G2.5">5G2.5</option>
+      </select>
+    </label>
+    </span>
+    <span class="sep" aria-hidden="true"></span>
+    <span class="split" id="rjSplit">
+    <button class="secondary" id="lineRJ45" aria-pressed="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5 6h14v9h-3v3H8v-3H5z"/><path d="M9 6v3M12 6v3M15 6v3"/></svg>
+      Ligne RJ45
+    </button>
+    <label class="cable" id="rjPicker" hidden>
+      <span class="swatch" aria-hidden="true" style="--c:#007A33"></span>
+      <select id="rjSelect" aria-label="Type de câble RJ45">
+        <option value="1x4P">1x4P</option>
+        <option value="2x4P">2x4P</option>
+      </select>
+    </label>
+    </span>
+    <span class="sep" aria-hidden="true"></span>
+    <span class="split" id="mesSplit">
+    <button class="secondary" id="lineMes" aria-pressed="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 17 17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg>
+      Mesure
+    </button>
+    <label class="cable picker" id="mesPalette" hidden>
+      <input type="color" id="mesColor" value="#dc2626" aria-label="Couleur de la mesure">
+      <span id="mesColorCode">#DC2626</span>
+    </label>
+    </span>
+    <span class="hint" id="hint" hidden>Cliquez sur le plan pour placer la boîte. Échap pour annuler.</span>
+  </div>
+  </div>
+  <aside class="calc" id="calc" aria-label="Calcul">
+    <header>
+      <h2>Calcul</h2>
+      <button class="icon" id="calcToggle" aria-label="Réduire la fenêtre" aria-expanded="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg>
+      </button>
+    </header>
+    <div class="calc-body">
+      <div id="calcSetup">
+        <p>Pour connaître l'échelle du plan, tracez sur le plan un segment dont vous connaissez la longueur réelle.</p>
+        <button class="primary" id="measureBtn">Première mesure</button>
+        <div class="measure-input" id="measureInput" hidden>
+          <label for="measureValue">Longueur réelle de ce segment
+            <span class="row"><input id="measureValue" type="number" min="0" step="any" inputmode="decimal"> m</span>
+          </label>
+          <div class="actions">
+            <button class="primary" id="measureOk">Valider</button>
+            <button class="secondary" id="measureCancel">Recommencer</button>
+          </div>
+        </div>
+      </div>
+      <div id="calcResults" hidden>
+        <p class="scale" id="scaleInfo"></p>
+        <div class="calc-head">
+          <h3 class="calc-sub">Lignes vers TD</h3>
+          <label class="extra" title="Longueur ajoutée à chaque ligne vers TD">
+            + <input id="tdExtra" type="number" min="0" step="any" inputmode="decimal" placeholder="0" aria-label="Mètres ajoutés à chaque ligne vers TD"> m
+          </label>
+        </div>
+        <ul class="calc-list" id="calcList"></ul>
+        <h3 class="calc-sub">Dérivations par catégorie</h3>
+        <ul class="calc-list" id="derList"></ul>
+        <h3 class="calc-sub">Lignes RJ45</h3>
+        <ul class="calc-list" id="rjList"></ul>
+        <button class="secondary" id="measureRedo">Refaire la première mesure</button>
+      </div>
+    </div>
+  </aside>
+  <section class="viewer" id="viewer">
+    <div class="pages" id="pages"></div>
+  </section>
+</div>
+
+<div class="ctx" id="ctx" role="menu" hidden>
+  <div class="ctx-title" id="ctxTitle"></div>
+  <button role="menuitem" id="ctxDelete">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+    <span id="ctxLabel">Supprimer</span>
+  </button>
+</div>
+
+<input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="jsonInput" accept="application/json,.json" hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const fileInput = $("fileInput"), welcome = $("welcome"), app = $("app"),
+        drop = $("drop"), errorBox = $("error"), pagesEl = $("pages");
+
+  if (!window.pdfjsLib) {
+    errorBox.textContent = "Le moteur de lecture PDF n'a pas pu se charger. Vérifiez votre connexion puis rechargez la page.";
+    $("pick").disabled = true;
+    return;
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  let pdfDoc = null, scale = 1, current = 1, renderToken = 0;
+  const pageViews = []; // { wrap, canvas, page, rendered }
+
+  $("pick").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (f) openFile(f);
+    fileInput.value = "";
+  });
+
+  // Glisser-déposer (sur l'accueil et sur la visionneuse)
+  ["dragenter", "dragover"].forEach(t => document.addEventListener(t, e => {
+    e.preventDefault(); drop.classList.add("over");
+  }));
+  ["dragleave", "drop"].forEach(t => document.addEventListener(t, e => {
+    e.preventDefault(); if (t === "drop" || e.target === document.documentElement) drop.classList.remove("over");
+  }));
+  document.addEventListener("drop", e => {
+    drop.classList.remove("over");
+    const f = e.dataTransfer && e.dataTransfer.files[0];
+    if (f) openFile(f);
+  });
+
+  async function openFile(file) {
+    errorBox.textContent = "";
+    if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
+      showError("Ce fichier n'est pas un PDF. Choisissez un fichier .pdf.");
+      return;
+    }
+    await openBytes(file.name, new Uint8Array(await file.arrayBuffer()));
+  }
+
+  // Ouvre un PDF depuis ses octets ; restaure le travail enregistré s'il existe
+  async function openBytes(name, bytes, known) {
+    project = null; dirty = false; // n'écrase jamais le travail précédent
+    try {
+      const id = name + "|" + bytes.byteLength;
+      const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      if (pdfDoc) pdfDoc.destroy();
+      pdfDoc = doc;
+      $("filename").textContent = name;
+      document.title = name + " – Visionneuse PDF";
+      welcome.hidden = true; app.hidden = false;
+      resetCalc(); placeCalc();
+      await buildPages();
+      project = { id, name, bytes };
+      const saved = known || await idbGet("projects", id);
+      if (saved) restoreState(saved.state);
+      setClean(saved ? "Travail restauré" : "", !!saved);
+    } catch (err) {
+      console.error(err);
+      showError(err && err.name === "PasswordException"
+        ? "Ce PDF est protégé par un mot de passe et ne peut pas être ouvert ici."
+        : "Impossible de lire ce PDF. Le fichier est peut-être endommagé.");
+    }
+  }
+
+  function showError(msg) {
+    app.hidden = true; welcome.hidden = false;
+    errorBox.textContent = msg;
+  }
+
+  async function buildPages() {
+    const token = ++renderToken;
+    pagesEl.innerHTML = '<div class="loading">Chargement des pages…</div>';
+    pageViews.length = 0;
+    boxCount = 0; setPlacing(false);
+    $("pageCount").textContent = pdfDoc.numPages;
+
+    const first = await pdfDoc.getPage(1);
+    scale = fitScale(first);
+    if (token !== renderToken) return;
+    pagesEl.innerHTML = "";
+
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = i === 1 ? first : await pdfDoc.getPage(i);
+      if (token !== renderToken) return;
+      const wrap = document.createElement("div");
+      wrap.className = "page"; wrap.dataset.num = i;
+      const canvas = document.createElement("canvas");
+      wrap.appendChild(canvas);
+      const overlay = document.createElement("div");
+      overlay.className = "overlay";
+      overlay.addEventListener("click", e => placeBox(e, i, overlay));
+      overlay.addEventListener("dblclick", e => finishLine(e, overlay));
+      overlay.addEventListener("contextmenu", e => openContext(e, overlay));
+      overlay.addEventListener("pointermove", e => {
+        if (mode === "measure") { measurePreview(e, overlay); return; }
+        if (isFree(mode)) { rjPreview(e, overlay); return; }
+        if (!drawing || boxInfo.get(drawing.box).overlay !== overlay) return;
+        const r = overlay.getBoundingClientRect();
+        updatePreview((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+      });
+      wrap.appendChild(overlay);
+      pagesEl.appendChild(wrap);
+      pageViews.push({ wrap, canvas, page, rendered: -1 });
+      sizePage(pageViews[i - 1]);
+      observer.observe(wrap);
+    }
+    current = 1; updateUi();
+    window.scrollTo(0, 0);
+  }
+
+  function fitScale(page) {
+    const vp = page.getViewport({ scale: 1 });
+    const avail = Math.min($("viewer").clientWidth - 32, 1100);
+    return Math.max(0.25, Math.min(3, avail / vp.width));
+  }
+
+  function sizePage(v) {
+    const vp = v.page.getViewport({ scale });
+    v.wrap.style.width = Math.floor(vp.width) + "px";
+    v.wrap.style.height = Math.floor(vp.height) + "px";
+  }
+
+  async function renderPage(v) {
+    if (v.rendered === scale || v.rendering) return;
+    v.rendering = true;
+    const target = scale;
+    const dpr = window.devicePixelRatio || 1;
+    const vp = v.page.getViewport({ scale: target * dpr });
+    const c = v.canvas;
+    c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+    c.style.width = Math.floor(vp.width / dpr) + "px";
+    c.style.height = Math.floor(vp.height / dpr) + "px";
+    try {
+      await v.page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+      v.rendered = target;
+    } catch (e) { console.error(e); }
+    v.rendering = false;
+    if (v.rendered !== scale && isNear(v.wrap)) renderPage(v);
+  }
+
+  function isNear(el) {
+    const r = el.getBoundingClientRect();
+    return r.bottom > -window.innerHeight && r.top < window.innerHeight * 2;
+  }
+
+  // Rendu paresseux : seules les pages proches de l'écran sont dessinées
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (en.isIntersecting) {
+        const v = pageViews[en.target.dataset.num - 1];
+        if (v) renderPage(v);
+      }
+    });
+  }, { rootMargin: "100% 0px" });
+
+  // Page courante selon le défilement
+  let ticking = false;
+  window.addEventListener("scroll", () => {
+    if (ticking || !pageViews.length) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const mid = window.innerHeight / 3;
+      for (const v of pageViews) {
+        const r = v.wrap.getBoundingClientRect();
+        if (r.bottom > mid) { current = +v.wrap.dataset.num; break; }
+      }
+      updateUi(); ticking = false;
+    });
+  }, { passive: true });
+
+  function updateUi() {
+    if (!pdfDoc) return;
+    if (document.activeElement !== $("pageInput")) $("pageInput").value = current;
+    $("prev").disabled = current <= 1;
+    $("next").disabled = current >= pdfDoc.numPages;
+    $("zoomLabel").textContent = Math.round(scale * 100) + " %";
+  }
+
+  function goTo(n) {
+    if (!pdfDoc) return;
+    n = Math.max(1, Math.min(pdfDoc.numPages, n));
+    const v = pageViews[n - 1]; if (!v) return;
+    const bar = $("bars").offsetHeight;
+    window.scrollTo({ top: v.wrap.offsetTop - bar - 12 });
+    current = n; updateUi();
+  }
+
+  function setScale(s) {
+    if (!pdfDoc) return;
+    const keep = current;
+    scale = Math.max(0.25, Math.min(4, Math.round(s * 100) / 100));
+    pageViews.forEach(v => { sizePage(v); if (isNear(v.wrap)) renderPage(v); });
+    goTo(keep);
+    // rendre les pages devenues visibles après le changement de taille
+    requestAnimationFrame(() => pageViews.forEach(v => { if (isNear(v.wrap)) renderPage(v); }));
+  }
+
+  // ---- Boîtes de dérivation et lignes vers TD ----
+  // Positions stockées en fraction de la page : elles suivent le zoom.
+  let mode = null, boxCount = 0, selected = null; // mode : null | "box" | "line"
+  let boxInfo = new Map(); // boîte -> { overlay, lines: [{ el, points: [{ x, y, handle }] }] }
+  let drawing = null;      // ligne en cours de tracé : { box, line, preview }
+  let lineKind = "td";     // "td" : une seule par boîte · "der" : autant que voulu
+  const CIRCUIT_COLORS = {
+    ECL:  "#00B8B8",  // entre teal et cyan
+    BAES: "#00C800",  // vert pur
+    PC:   "#0000FF",  // bleu pur
+    ALIM: "#7F1D1D"   // rouge foncé
+  };
+  let circuit = "ECL", section = "3G1.5";
+  const circuitColor = () => CIRCUIT_COLORS[circuit];
+  function applyCable() {
+    $("cablePicker").style.setProperty("--c", circuitColor());
+    const alim = circuit === "ALIM" && mode === "line" && lineKind === "der";
+    $("sectionPicker").hidden = !alim;
+    $("derSplit").classList.toggle("alim", alim);
+    // le tracé en cours prend aussi le circuit choisi
+    if (drawing && drawing.line.kind === "der") styleDer(drawing.line, drawing.preview);
+  }
+  function styleDer(line, preview) {
+    line.circuit = circuit;
+    line.section = circuit === "ALIM" ? section : null;
+    line.el.style.setProperty("--c", circuitColor());
+    if (preview) preview.style.setProperty("--c", circuitColor());
+    line.points.forEach(p => p.handle.style.setProperty("--c", circuitColor()));
+    line.el.dataset.circuit = circuit;
+  }
+  $("cableSelect").addEventListener("change", e => { circuit = e.target.value; applyCable(); });
+  $("sectionSelect").addEventListener("change", e => { section = e.target.value; applyCable(); });
+  const HINTS = {
+    box: "Cliquez sur le plan pour placer la boîte. Échap pour annuler.",
+    line: "Cliquez pour poser un coin, double-cliquez pour valider le point final. Retour arrière retire le dernier coin, Échap annule.",
+    ruler: "Mesure : cliquez le départ puis les coins, double-cliquez pour afficher la longueur. Échap pour quitter.",
+    rj: "Cliquez le départ puis les coins, double-cliquez pour valider. L'outil reste actif, Échap pour quitter.",
+    measure: "Cliquez sur le début du segment de référence. Échap pour annuler.",
+    der: "Cliquez pour poser un coin, double-cliquez pour valider. L'outil reste actif : cliquez une autre boîte pour en partir, Échap pour quitter."
+  };
+
+  function setMode(m) {
+    if (mode === "line" && m !== "line" && drawing) cancelDrawing();
+    if (isFree(mode) && m !== mode && rjDrawing) cancelRj();
+    $("lineRJ45").setAttribute("aria-pressed", m === "rj");
+    $("lineMes").setAttribute("aria-pressed", m === "ruler");
+    $("rjPicker").hidden = m !== "rj";
+    $("rjSplit").classList.toggle("open", m === "rj");
+    $("mesPalette").hidden = m !== "ruler";
+    $("mesSplit").classList.toggle("open", m === "ruler");
+    mode = m;
+    document.body.classList.toggle("placing", !!m);
+    $("addBox").setAttribute("aria-pressed", m === "box");
+    $("lineTD").setAttribute("aria-pressed", m === "line" && lineKind === "td");
+    const derOn = m === "line" && lineKind === "der";
+    $("lineDer").setAttribute("aria-pressed", derOn);
+    $("cablePicker").hidden = !derOn;
+    $("derSplit").classList.toggle("open", derOn);
+    applyCable();
+    $("hint").hidden = !m;
+    if (m) $("hint").textContent = HINTS[m === "line" && lineKind === "der" ? "der" : m];
+  }
+  // compatibilité avec l'appel existant à l'ouverture d'un PDF
+  function setPlacing(on) { setMode(on ? "box" : null); if (!on) { boxInfo = new Map(); rjLines = []; select(null); } }
+
+  $("addBox").addEventListener("click", () => setMode(mode === "box" ? null : "box"));
+  function startLine(kind) {
+    if (!selected) return;
+    const same = mode === "line" && lineKind === kind;
+    setMode(null);            // termine/annule un éventuel tracé de l'autre type
+    if (same) return;
+    if (kind === "td" && hasTd(selected)) return;
+    lineKind = kind;
+    setMode("line");
+  }
+  $("lineTD").addEventListener("click", () => startLine("td"));
+  $("lineDer").addEventListener("click", () => startLine("der"));
+  const hasTd = box => boxInfo.get(box).lines.some(l => l.kind === "td");
+
+  function placeBox(e, pageNum, overlay) {
+    const r = overlay.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    if (mode === "measure") {
+      measureClick(overlay, pageNum, x, y);
+    } else if (isFree(mode)) {
+      rjClick(overlay, pageNum, x, y, r);
+    } else if (mode === "box") {
+      const box = createBox(overlay, x, y, pageNum);
+      setMode(null); select(box);
+    } else if (mode === "line") {
+      const info = selected && boxInfo.get(selected);
+      if (!info) { setMode(null); return; }
+      if (info.overlay !== overlay) {
+        $("hint").textContent = "L'extrémité doit être sur la même page que la boîte " + selected.dataset.label + ".";
+        return;
+      }
+      addPoint(selected, x, y, r);
+    } else {
+      select(null);
+    }
+  }
+
+  function getSvg(overlay) {
+    let svg = overlay.querySelector("svg.lines");
+    if (!svg) {
+      svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "lines");
+      svg.setAttribute("viewBox", "0 0 1 1");
+      svg.setAttribute("preserveAspectRatio", "none");
+      overlay.prepend(svg);
+    }
+    return svg;
+  }
+
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  // Clic en mode tracé : pose un coin (le premier clic crée la ligne)
+  function addPoint(box, x, y, rect) {
+    const info = boxInfo.get(box);
+    if (!drawing) {
+      const svg = getSvg(info.overlay);
+      const el = document.createElementNS(SVGNS, "polyline");
+      el.setAttribute("class", lineKind === "der" ? "td-line der" : "td-line");
+      el.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(el);
+      const preview = document.createElementNS(SVGNS, "line");
+      preview.setAttribute("class", lineKind === "der" ? "td-preview der" : "td-preview");
+      preview.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(preview);
+      const line = { el, points: [], kind: lineKind };
+      info.lines.push(line);
+      drawing = { box, line, preview };
+      if (line.kind === "der") styleDer(line, preview);
+    }
+    const pts = drawing.line.points, last = pts[pts.length - 1];
+    // Le double-clic envoie deux clics au même endroit : on n'ajoute pas de doublon
+    if (last && Math.hypot((last.x - x) * rect.width, (last.y - y) * rect.height) < 6) return;
+    const p = { x, y };
+    p.handle = makeHandle(box, info, p);
+    p.handle.dataset.kind = drawing.line.kind;
+    if (drawing.line.kind === "der") p.handle.style.setProperty("--c", CIRCUIT_COLORS[drawing.line.circuit]);
+    pts.push(p);
+    refreshHandles(drawing.line);
+    drawLines(box);
+    updatePreview(x, y);
+  }
+
+  // Double-clic : le dernier point posé devient le point final
+  function finishLine(e, overlay) {
+    if (isFree(mode)) return rjFinish(e, overlay);
+    if (mode !== "line" || !drawing) return;
+    e.preventDefault();
+    const info = boxInfo.get(drawing.box);
+    if (info.overlay !== overlay) return;
+    const r = overlay.getBoundingClientRect();
+    addPoint(drawing.box, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, r);
+    const line = drawing.line;
+    drawing.preview.remove();
+    drawing = null;
+    if (line.kind === "der" && line.section) {
+      const end = line.points[line.points.length - 1].handle;
+      const lab = document.createElement("span");
+      lab.className = "end-label";
+      lab.textContent = line.section;
+      end.appendChild(lab);
+    }
+    // Ligne de dérivation : l'outil reste actif pour enchaîner les tracés
+    if (line.kind === "der") setMode("line"); else setMode(null);
+    updateLineButton();
+  }
+
+  function cancelDrawing() {
+    const { box, line, preview } = drawing;
+    preview.remove(); line.el.remove();
+    line.points.forEach(p => p.handle.remove());
+    const info = boxInfo.get(box);
+    if (info) info.lines = info.lines.filter(l => l !== line);
+    drawing = null;
+    updateLineButton();
+    updateCalc();
+  }
+
+  function removeLastPoint() {
+    const pts = drawing.line.points;
+    const p = pts.pop(); if (p) p.handle.remove();
+    if (!pts.length) { const k = drawing.line.kind; cancelDrawing(); lineKind = k; setMode("line"); return; }
+    refreshHandles(drawing.line);
+    drawLines(drawing.box);
+  }
+
+  function updatePreview(x, y) {
+    if (!drawing) return;
+    const pts = drawing.line.points, b = drawing.box;
+    const from = pts.length ? pts[pts.length - 1] : { x: +b.dataset.x, y: +b.dataset.y };
+    const pv = drawing.preview;
+    pv.setAttribute("x1", from.x); pv.setAttribute("y1", from.y);
+    pv.setAttribute("x2", x); pv.setAttribute("y2", y);
+  }
+
+  // Poignée déplaçable pour un coin ou pour le point final
+  function makeHandle(box, info, p) {
+    return makeFreeHandle(info.overlay, p, () => drawLines(box));
+  }
+  function makeFreeHandle(overlay, p, redraw) {
+    const info = { overlay };
+    const h = document.createElement("div");
+    overlay.appendChild(h);
+    h.addEventListener("click", e => e.stopPropagation());
+    h.addEventListener("dblclick", e => e.stopPropagation());
+    h.addEventListener("pointerdown", e => {
+      if (e.button !== 0) return;
+      e.stopPropagation(); e.preventDefault();
+      if (mode) return;
+      h.setPointerCapture(e.pointerId); h.classList.add("dragging");
+      const move = ev => {
+        const r = info.overlay.getBoundingClientRect();
+        p.x = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+        p.y = Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height));
+        redraw();
+      };
+      const up = () => {
+        h.classList.remove("dragging");
+        h.removeEventListener("pointermove", move);
+        h.removeEventListener("pointerup", up);
+      };
+      h.addEventListener("pointermove", move);
+      h.addEventListener("pointerup", up);
+    });
+    return h;
+  }
+
+  // Le dernier point porte la pastille « TD », les autres sont des coins
+  function refreshHandles(line) {
+    const n = line.points.length;
+    line.points.forEach((p, i) => {
+      const end = i === n - 1;
+      p.handle.className = end ? "td-end" : "td-vertex";
+      p.handle.title = end
+        ? (line.kind === "der"
+            ? "Point final " + line.circuit + (line.section ? " " + line.section : "")
+            : "Point final vers TD") + " · glisser pour déplacer"
+        : "Coin · glisser pour déplacer";
+    });
+  }
+
+  function drawLines(box) {
+    const info = boxInfo.get(box); if (!info) return;
+    updateCalc();
+    const bx = +box.dataset.x, by = +box.dataset.y;
+    info.lines.forEach(l => {
+      l.el.setAttribute("points", [[bx, by], ...l.points.map(p => [p.x, p.y])].map(c => c.join(",")).join(" "));
+      l.points.forEach(p => { p.handle.style.left = (p.x * 100) + "%"; p.handle.style.top = (p.y * 100) + "%"; });
+    });
+  }
+
+  // Le bouton n'apparaît que pour une boîte sélectionnée qui n'a pas encore sa ligne
+  function updateLineButton() {
+    const info = selected && boxInfo.get(selected);
+    $("lineTD").hidden = !info || hasTd(selected);
+    $("derSplit").hidden = !info;
+  }
+
+  function removeBox(box) {
+    const info = boxInfo.get(box);
+    if (info) info.lines.forEach(l => { l.el.remove(); l.points.forEach(p => p.handle.remove()); });
+    boxInfo.delete(box);
+    box.remove();
+    updateCalc();
+  }
+
+  function createBox(overlay, x, y, pageNum) {
+    boxCount++;
+    const b = document.createElement("button");
+    b.className = "jbox";
+    b.dataset.page = pageNum;
+    b.dataset.label = "BD" + boxCount;
+    b.setAttribute("aria-label", "Boîte de dérivation BD" + boxCount + ", page " + pageNum);
+    b.title = "Glisser pour déplacer · Suppr pour effacer";
+    b.innerHTML = "<span>BD" + boxCount + "</span>";
+    boxInfo.set(b, { overlay, lines: [] });
+    updateCalc();
+    setPos(b, x, y);
+    overlay.appendChild(b);
+
+    b.addEventListener("click", e => {
+      e.stopPropagation();
+      if (mode === "line" && lineKind === "der" && !drawing) { select(b); setMode("line"); return; }
+      if (mode !== "line") select(b);
+    });
+    b.addEventListener("pointerdown", e => {
+      e.stopPropagation();
+      if (e.button !== 0) return; // clic droit : menu contextuel, pas de déplacement
+      if (mode) return;
+      select(b);
+      b.setPointerCapture(e.pointerId); b.classList.add("dragging");
+      const move = ev => {
+        const r = overlay.getBoundingClientRect();
+        setPos(b,
+          Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)),
+          Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height)));
+      };
+      const up = () => {
+        b.classList.remove("dragging");
+        b.removeEventListener("pointermove", move);
+        b.removeEventListener("pointerup", up);
+      };
+      b.addEventListener("pointermove", move);
+      b.addEventListener("pointerup", up);
+    });
+    return b;
+  }
+
+  function setPos(b, x, y) {
+    b.dataset.x = x; b.dataset.y = y;
+    b.style.left = (x * 100) + "%"; b.style.top = (y * 100) + "%";
+    drawLines(b);
+  }
+
+  function select(b) {
+    if (selected) selected.classList.remove("selected");
+    selected = b;
+    if (b) { b.classList.add("selected"); b.focus({ preventScroll: true }); }
+    updateLineButton();
+    if (!b && mode === "line") setMode(null);
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      // dérivation : 1er Échap annule le tracé en cours, 2e Échap quitte l'outil
+      if (drawing && drawing.line.kind === "der") cancelDrawing();
+      else if (rjDrawing) cancelRj();
+      else if (mode === "measure") { setMode(null); resetCalc(); }
+      else if (mode) setMode(null); else select(null);
+    }
+    if (e.key === "Backspace" && rjDrawing && !/^(INPUT|SELECT)$/.test(e.target.tagName)) {
+      e.preventDefault(); rjRemoveLast(); return;
+    }
+    if (e.key === "Backspace" && drawing && !/^(INPUT|SELECT)$/.test(e.target.tagName)) {
+      e.preventDefault(); removeLastPoint(); return;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && selected && !mode && !/^(INPUT|SELECT)$/.test(e.target.tagName)) {
+      e.preventDefault(); removeBox(selected); select(null);
+    }
+  });
+
+  // ---- Lignes libres : RJ45 et Mesure (sans boîte) ----
+  // ligne : { kind: "rj" | "mes", overlay, pageNum, el, points: [{ x, y, handle }], variant?, color? }
+  let rjLines = [], rjDrawing = null;
+  const isFree = m => m === "rj" || m === "ruler";
+  let rjVariant = "1x4P";
+  $("rjSelect").addEventListener("change", e => { rjVariant = e.target.value; });
+
+  let mesColor = "#DC2626";
+  $("mesColor").addEventListener("input", e => {
+    mesColor = e.target.value.toUpperCase();
+    $("mesColorCode").textContent = mesColor;
+    if (rjDrawing && rjDrawing.line.kind === "mes") colorMes(rjDrawing.line, rjDrawing.preview);
+  });
+  function colorMes(line, preview) {
+    line.color = mesColor;
+    line.el.style.setProperty("--c", mesColor);
+    if (preview) preview.style.setProperty("--c", mesColor);
+    line.points.forEach(p => p.handle.style.setProperty("--c", mesColor));
+  }
+
+  const toggleFree = m => () => { const on = mode === m; setMode(null); if (!on) setMode(m); };
+  $("lineRJ45").addEventListener("click", toggleFree("rj"));
+  $("lineMes").addEventListener("click", toggleFree("ruler"));
+
+  function rjClick(overlay, pageNum, x, y, rect) {
+    if (!rjDrawing) {
+      const kind = mode === "ruler" ? "mes" : "rj";
+      const svg = getSvg(overlay);
+      const el = document.createElementNS(SVGNS, "polyline");
+      el.setAttribute("class", kind === "mes" ? "mes-line" : "rj-line");
+      el.setAttribute("vector-effect", "non-scaling-stroke");
+      const preview = document.createElementNS(SVGNS, "line");
+      preview.setAttribute("class", kind === "mes" ? "mes-preview" : "rj-preview");
+      preview.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.append(el, preview);
+      rjDrawing = { line: { kind, overlay, pageNum, el, points: [] }, preview };
+      if (kind === "mes") colorMes(rjDrawing.line, preview);
+    }
+    const line = rjDrawing.line;
+    if (overlay !== line.overlay) { $("hint").textContent = "Le tracé doit rester sur une seule page."; return; }
+    const last = line.points[line.points.length - 1];
+    if (last && Math.hypot((last.x - x) * rect.width, (last.y - y) * rect.height) < 6) return;
+    const p = { x, y };
+    p.handle = makeFreeHandle(overlay, p, () => drawRj(line));
+    p.handle.dataset.kind = line.kind;
+    if (line.kind === "mes") p.handle.style.setProperty("--c", line.color);
+    line.points.push(p);
+    drawRj(line);
+    setRjPreview(x, y);
+  }
+
+  function rjFinish(e, overlay) {
+    if (!rjDrawing || overlay !== rjDrawing.line.overlay) return;
+    e.preventDefault();
+    const r = overlay.getBoundingClientRect();
+    rjClick(overlay, rjDrawing.line.pageNum, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, r);
+    finalizeFree();
+  }
+
+  function finalizeFree() {
+    const line = rjDrawing.line;
+    if (line.points.length < 2) return; // il faut au moins un départ et une arrivée
+    rjDrawing.preview.remove();
+    rjDrawing = null;
+    if (line.kind === "rj") line.variant = rjVariant;
+    const lab = document.createElement("span");
+    lab.className = "end-label";
+    line.label = lab;
+    line.points[line.points.length - 1].handle.appendChild(lab);
+    rjLines.push(line);
+    drawRj(line);
+  }
+
+  function cancelRj() {
+    const { line, preview } = rjDrawing;
+    preview.remove(); line.el.remove();
+    line.points.forEach(p => p.handle.remove());
+    rjDrawing = null;
+    updateCalc();
+  }
+
+  function rjRemoveLast() {
+    const pts = rjDrawing.line.points;
+    const p = pts.pop(); if (p) p.handle.remove();
+    if (!pts.length) { cancelRj(); return; }
+    drawRj(rjDrawing.line);
+  }
+
+  function rjPreview(e, overlay) {
+    if (!rjDrawing || overlay !== rjDrawing.line.overlay) return;
+    const r = overlay.getBoundingClientRect();
+    setRjPreview((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+  }
+  function setRjPreview(x, y) {
+    const pts = rjDrawing.line.points, from = pts[pts.length - 1], pv = rjDrawing.preview;
+    pv.setAttribute("x1", from.x); pv.setAttribute("y1", from.y);
+    pv.setAttribute("x2", x); pv.setAttribute("y2", y);
+  }
+
+  function lineLabel(line) {
+    if (line.kind === "rj") return line.variant;
+    if (metersPerPt === null) return "échelle à définir";
+    return fmt(polyLengthPt(line.pageNum, line.points) * metersPerPt) + " m";
+  }
+  // Rafraîchit les étiquettes de mesure (après un changement d'échelle)
+  function refreshMesLabels() {
+    rjLines.forEach(l => { if (l.kind === "mes" && l.label) l.label.textContent = lineLabel(l); });
+  }
+
+  function drawRj(line) {
+    const n = line.points.length;
+    const name = line.kind === "mes" ? "mesure" : "RJ45";
+    line.el.setAttribute("points", line.points.map(p => p.x + "," + p.y).join(" "));
+    line.points.forEach((p, i) => {
+      const end = i === n - 1 && n > 1;
+      p.handle.className = end ? "td-end" : "td-vertex";
+      p.handle.title = (i === 0 ? "Départ " : end ? "Point final " : "Coin ") + name + " · glisser pour déplacer";
+      p.handle.style.left = (p.x * 100) + "%"; p.handle.style.top = (p.y * 100) + "%";
+    });
+    if (line.label) line.label.textContent = lineLabel(line);
+    if (line.kind === "rj") updateCalc();
+  }
+
+  // ---- Menu contextuel (clic droit) ----
+  let ctxTarget = null; // { kind: "box" | "line" | "rj", box?, line, hl }
+  const LINE_HIT_PX = 8;
+
+  function distToSeg(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  }
+  function polyDist(r, px, py, pts) {
+    let d = Infinity;
+    for (let i = 1; i < pts.length; i++)
+      d = Math.min(d, distToSeg(px, py, pts[i - 1].x * r.width, pts[i - 1].y * r.height, pts[i].x * r.width, pts[i].y * r.height));
+    return d;
+  }
+
+  // Cherche l'élément visé : boîte, sinon la ligne la plus proche du clic
+  function findTarget(e, overlay) {
+    const box = e.target.closest && e.target.closest(".jbox");
+    if (box) return { kind: "box", box, hl: box };
+    const r = overlay.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    let best = null, bestD = LINE_HIT_PX;
+    boxInfo.forEach((info, b) => {
+      if (info.overlay !== overlay || !b.isConnected) return;
+      const origin = { x: +b.dataset.x, y: +b.dataset.y };
+      info.lines.forEach(l => {
+        if (!l.points.length) return;
+        const d = polyDist(r, px, py, [origin, ...l.points]);
+        if (d <= bestD) { bestD = d; best = { kind: "line", box: b, line: l, hl: l.el }; }
+      });
+    });
+    rjLines.forEach(l => {
+      if (l.overlay !== overlay) return;
+      const d = polyDist(r, px, py, l.points);
+      if (d <= bestD) { bestD = d; best = { kind: "rj", line: l, hl: l.el }; }
+    });
+    return best;
+  }
+
+  function openContext(e, overlay) {
+    if (drawing || rjDrawing || mode === "measure") return; // pas pendant un tracé
+    const t = findTarget(e, overlay);
+    if (!t) { closeContext(); return; }
+    e.preventDefault();
+    closeContext();
+    ctxTarget = t;
+    t.hl.classList.add("ctx-target");
+    let title, label;
+    if (t.kind === "box") { title = t.box.dataset.label; label = "Supprimer la boîte"; }
+    else if (t.kind === "rj") {
+      title = t.line.kind === "mes" ? "Mesure" : "Ligne RJ45 " + t.line.variant;
+      label = t.line.kind === "mes" ? "Supprimer la mesure" : "Supprimer la ligne";
+    }
+    else if (t.line.kind === "td") { title = "Ligne vers TD · " + t.box.dataset.label; label = "Supprimer la ligne"; }
+    else {
+      title = "Dérivation " + t.line.circuit + (t.line.section ? " " + t.line.section : "") + " · " + t.box.dataset.label;
+      label = "Supprimer la ligne";
+    }
+    $("ctxTitle").textContent = title;
+    $("ctxLabel").textContent = label;
+    const m = $("ctx");
+    m.hidden = false;
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.min(e.clientX, window.innerWidth - w - 8) + "px";
+    m.style.top = Math.min(e.clientY, window.innerHeight - h - 8) + "px";
+    $("ctxDelete").focus();
+  }
+
+  function closeContext() {
+    if (ctxTarget) ctxTarget.hl.classList.remove("ctx-target");
+    ctxTarget = null;
+    $("ctx").hidden = true;
+  }
+
+  function deleteBoxLine(box, line) {
+    line.el.remove();
+    line.points.forEach(p => p.handle.remove());
+    const info = boxInfo.get(box);
+    info.lines = info.lines.filter(l => l !== line);
+    updateLineButton();
+    updateCalc();
+  }
+  function deleteRj(line) {
+    line.el.remove();
+    line.points.forEach(p => p.handle.remove());
+    rjLines = rjLines.filter(l => l !== line);
+    updateCalc();
+  }
+
+  $("ctxDelete").addEventListener("click", () => {
+    const t = ctxTarget; closeContext();
+    if (!t) return;
+    if (t.kind === "box") { if (selected === t.box) select(null); removeBox(t.box); updateLineButton(); }
+    else if (t.kind === "rj") deleteRj(t.line);
+    else deleteBoxLine(t.box, t.line);
+  });
+  document.addEventListener("pointerdown", e => { if (!$("ctx").hidden && !$("ctx").contains(e.target)) closeContext(); }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("ctx").hidden) { e.stopImmediatePropagation(); closeContext(); } }, true);
+  window.addEventListener("scroll", closeContext, { passive: true });
+  window.addEventListener("resize", closeContext);
+
+  // ---- Sauvegarde manuelle (IndexedDB, dans ce navigateur) ----
+  // Rien n'est écrit tant que l'on n'a pas cliqué sur « Enregistrer » (ou Ctrl+S).
+  let project = null, scaleValue = null, restoring = false, dirty = false, everSaved = false;
+  const RESTORE_RECT = { width: 1e6, height: 1e6 }; // évite la fusion de points proches
+  let dbPromise = null;
+  function idb() {
+    if (!dbPromise) dbPromise = new Promise((res, rej) => {
+      try {
+        const rq = indexedDB.open("visionneuse-pdf", 1);
+        rq.onupgradeneeded = () => {
+          rq.result.createObjectStore("projects", { keyPath: "id" });
+          rq.result.createObjectStore("files", { keyPath: "id" });
+        };
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => rej(rq.error);
+      } catch (e) { rej(e); }
+    });
+    return dbPromise;
+  }
+  function idbTx(store, modeTx, fn) {
+    return idb().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(store, modeTx);
+      const rq = fn(tx.objectStore(store));
+      tx.oncomplete = () => res(rq && rq.result);
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+  const idbGet = (st, id) => idbTx(st, "readonly", o => o.get(id)).catch(() => null);
+  const idbPut = (st, v) => idbTx(st, "readwrite", o => o.put(v));
+  const idbDel = (st, id) => idbTx(st, "readwrite", o => o.delete(id));
+  const idbAll = st => idbTx(st, "readonly", o => o.getAll()).catch(() => []);
+
+  function setSaveState(t) { $("saveState").textContent = t; }
+
+  function serialize() {
+    const pt = p => [p.x, p.y];
+    return {
+      version: 1, boxCount,
+      metersPerPt, scaleValue,
+      tdExtra: $("tdExtra").value,
+      circuit, section, rjVariant, mesColor,
+      boxes: [...boxInfo.entries()].filter(([b]) => b.isConnected).map(([b, info]) => ({
+        label: b.dataset.label, page: +b.dataset.page, x: +b.dataset.x, y: +b.dataset.y,
+        lines: info.lines.filter(l => l.points.length && (!drawing || drawing.line !== l)).map(l => ({
+          kind: l.kind, circuit: l.circuit || null, section: l.section || null, points: l.points.map(pt)
+        }))
+      })),
+      free: rjLines.filter(l => l.el.isConnected).map(l => ({
+        kind: l.kind, page: l.pageNum, variant: l.variant || null, color: l.color || null, points: l.points.map(pt)
+      }))
+    };
+  }
+
+  function setClean(text, saved) {
+    dirty = false;
+    everSaved = !!saved;
+    $("saveState").classList.remove("dirty");
+    setSaveState(text);
+    $("saveBtn").disabled = !!saved;
+  }
+
+  function markDirty() {
+    if (restoring || !project) return;
+    dirty = true;
+    $("saveState").classList.add("dirty");
+    setSaveState("Modifications non enregistrées");
+    $("saveBtn").disabled = false;
+  }
+
+  async function saveNow() {
+    if (!project) return;
+    $("saveBtn").disabled = true;
+    setSaveState("Enregistrement…");
+    try {
+      await idbPut("files", { id: project.id, bytes: project.bytes });
+      await idbPut("projects", { id: project.id, name: project.name, updatedAt: Date.now(), state: serialize() });
+      const t = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      setClean("Enregistré à " + t, true);
+      renderSaved();
+    } catch (e) {
+      $("saveBtn").disabled = false;
+      $("saveState").classList.add("dirty");
+      setSaveState("Échec de l'enregistrement");
+    }
+  }
+  $("saveBtn").addEventListener("click", saveNow);
+  document.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && !app.hidden) { e.preventDefault(); saveNow(); }
+  });
+  // Prévient avant de fermer si des modifications ne sont pas enregistrées
+  window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+  // Toute modification des annotations est signalée comme non enregistrée
+  new MutationObserver(muts => {
+    if (muts.some(m => m.target.nodeName !== "CANVAS" && !(m.target.classList && m.target.classList.contains("page")))) markDirty();
+  }).observe(pagesEl, { subtree: true, childList: true, attributes: true, attributeFilter: ["style", "points", "data-x", "data-y"] });
+  $("tdExtra").addEventListener("input", markDirty);
+  ["cableSelect", "sectionSelect", "rjSelect", "mesColor"].forEach(id => $(id).addEventListener("change", markDirty));
+  $("measureOk").addEventListener("click", markDirty);
+
+  function restoreState(st) {
+    if (!st) return;
+    restoring = true;
+    const keep = { mode, lineKind, circuit, section, rjVariant, mesColor };
+    try {
+      if (st.metersPerPt) {
+        metersPerPt = st.metersPerPt; scaleValue = st.scaleValue;
+        $("calcSetup").hidden = true; $("calcResults").hidden = false;
+        $("scaleInfo").textContent = scaleValue
+          ? "Échelle définie par un segment de " + fmt(scaleValue) + " m." : "Échelle définie.";
+      }
+      $("tdExtra").value = st.tdExtra || "";
+      const ov = n => pageViews[n - 1] && pageViews[n - 1].wrap.querySelector(".overlay");
+
+      (st.boxes || []).forEach(sb => {
+        const overlay = ov(sb.page); if (!overlay) return;
+        boxCount = parseInt(sb.label.slice(2), 10) - 1;
+        const box = createBox(overlay, sb.x, sb.y, sb.page);
+        sb.lines.forEach(sl => {
+          lineKind = sl.kind; drawing = null;
+          if (sl.kind === "der") { circuit = sl.circuit; section = sl.section || section; }
+          sl.points.forEach(([x, y]) => addPoint(box, x, y, RESTORE_RECT));
+          if (!drawing) return;
+          const line = drawing.line;
+          if (sl.kind === "der") line.section = sl.circuit === "ALIM" ? sl.section : null;
+          drawing.preview.remove(); drawing = null;
+          if (line.section) {
+            const lab = document.createElement("span");
+            lab.className = "end-label"; lab.textContent = line.section;
+            line.points[line.points.length - 1].handle.appendChild(lab);
+          }
+        });
+      });
+      boxCount = Math.max(boxCount, st.boxCount || 0);
+
+      (st.free || []).forEach(sf => {
+        const overlay = ov(sf.page); if (!overlay) return;
+        mode = sf.kind === "mes" ? "ruler" : "rj"; rjDrawing = null;
+        if (sf.color) mesColor = sf.color;
+        if (sf.variant) rjVariant = sf.variant;
+        sf.points.forEach(([x, y]) => rjClick(overlay, sf.page, x, y, RESTORE_RECT));
+        if (rjDrawing) { finalizeFree(); if (rjDrawing) cancelRj(); }
+      });
+
+      // réglages des outils
+      circuit = st.circuit || keep.circuit; section = st.section || keep.section;
+      rjVariant = st.rjVariant || keep.rjVariant; mesColor = st.mesColor || keep.mesColor;
+      $("cableSelect").value = circuit; $("sectionSelect").value = section;
+      $("rjSelect").value = rjVariant;
+      $("mesColor").value = mesColor.toLowerCase(); $("mesColorCode").textContent = mesColor.toUpperCase();
+      lineKind = keep.lineKind; mode = null; drawing = null; rjDrawing = null;
+      setMode(null); select(null);
+      refreshMesLabels();
+      updateCalc(true);
+    } catch (e) {
+      console.error("Restauration incomplète", e);
+    }
+    // les notifications de modification arrivent juste après : on les ignore
+    Promise.resolve().then(() => { restoring = false; });
+  }
+
+  // ---- Export / Import ----
+  const xPanel = $("xmenuPanel"), xBtn = $("xmenuBtn");
+  function xOpen(open) {
+    xPanel.hidden = !open;
+    xBtn.setAttribute("aria-expanded", open);
+    if (!open) xStatus(null);
+  }
+  xBtn.addEventListener("click", () => xOpen(xPanel.hidden));
+  document.addEventListener("pointerdown", e => { if (!xPanel.hidden && !$("xmenu").contains(e.target)) xOpen(false); }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !xPanel.hidden) { e.stopImmediatePropagation(); xOpen(false); } }, true);
+
+  function xStatus(html, isError) {
+    const el = $("xStatus");
+    if (!html) { el.hidden = true; el.innerHTML = ""; return; }
+    el.hidden = false; el.classList.toggle("error", !!isError);
+    el.innerHTML = html;
+  }
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const baseName = () => project.name.replace(/\.pdf$/i, "");
+
+  // Téléchargement : capacité « downloads » sur la page publiée, lien classique sinon
+  async function offerFile(filename, data) {
+    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+    if (dl) {
+      try { await dl.save({ filename, data }); return "saved"; }
+      catch (e) {
+        if (e && e.code === "declined") return "declined";
+        if (e && e.code === "rate_limited") throw new Error("Une demande de téléchargement est déjà ouverte.");
+        throw new Error("Le téléchargement n'est pas disponible ici.");
+      }
+    }
+    if (window.claude) throw new Error("Le téléchargement n'est pas disponible ici.");
+    const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data]));
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return "saved";
+  }
+
+  // --- Export des modifications seules (.json)
+  $("exportJson").addEventListener("click", async () => {
+    if (!project) return;
+    const payload = {
+      format: "visionneuse-pdf/annotations", version: 1,
+      pdf: { name: project.name, size: project.bytes.byteLength },
+      exportedAt: new Date().toISOString(),
+      state: serialize()
+    };
+    try {
+      const r = await offerFile(baseName() + " - annotations.json", JSON.stringify(payload, null, 2));
+      xStatus(r === "declined" ? "Export annulé." : "Fichier d'annotations exporté.");
+    } catch (e) { xStatus(esc(e.message), true); }
+  });
+
+  // --- Import des modifications
+  $("importJson").addEventListener("click", () => { $("jsonInput").click(); });
+  $("jsonInput").addEventListener("change", async e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f || !project) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch { data = null; }
+    if (!data || data.format !== "visionneuse-pdf/annotations" || !data.state) {
+      xStatus("Ce fichier n'est pas un export d'annotations de la visionneuse.", true);
+      return;
+    }
+    const other = data.pdf && (data.pdf.name !== project.name || data.pdf.size !== project.bytes.byteLength);
+    const n = (data.state.boxes || []).length, m = (data.state.free || []).length;
+    const has = [...boxInfo.keys()].some(b => b.isConnected) || rjLines.some(l => l.el.isConnected) || metersPerPt !== null;
+    const summary = n + (n > 1 ? " boîtes" : " boîte") + ", " + m + (m > 1 ? " lignes libres" : " ligne libre");
+    const warn = [];
+    if (other) warn.push("Ces annotations ont été faites sur « " + esc(data.pdf.name) + " », pas sur ce plan.");
+    if (has) warn.push("Elles remplaceront les annotations actuelles.");
+    if (!warn.length) { applyImport(data.state); return; }
+    xStatus("<div>" + esc(f.name) + " : " + summary + ".</div><div>" + warn.join(" ") + "</div>" +
+      '<div class="row"><button class="go" id="xGo">Importer</button><button id="xNo">Annuler</button></div>');
+    $("xGo").addEventListener("click", () => applyImport(data.state));
+    $("xNo").addEventListener("click", () => xStatus(null));
+  });
+
+  function clearAnnotations() {
+    if (drawing) cancelDrawing();
+    if (rjDrawing) cancelRj();
+    setMode(null); select(null);
+    [...boxInfo.keys()].forEach(b => removeBox(b));
+    rjLines.slice().forEach(l => deleteRj(l));
+    boxInfo = new Map(); rjLines = []; boxCount = 0;
+    resetCalc(); scaleValue = null;
+  }
+
+  function applyImport(state) {
+    clearAnnotations();
+    restoreState(state);
+    xStatus("Modifications importées. Pensez à enregistrer pour les conserver.");
+    setTimeout(markDirty, 0); // non enregistré tant que l'on n'a pas cliqué « Enregistrer »
+  }
+
+  // --- Export du PDF annoté (annotations dessinées dans le PDF)
+  $("exportPdf").addEventListener("click", async () => {
+    if (!project) return;
+    if (!window.PDFLib) { xStatus("Le module d'export PDF n'a pas pu se charger. Rechargez la page.", true); return; }
+    xStatus("Préparation du PDF…");
+    try {
+      const bytes = await buildAnnotatedPdf();
+      const r = await offerFile(baseName() + " - annoté.pdf", new Blob([bytes], { type: "application/pdf" }));
+      xStatus(r === "declined" ? "Export annulé." : "PDF annoté exporté.");
+    } catch (e) {
+      console.error(e);
+      xStatus(esc(e.message || "L'export du PDF a échoué."), true);
+    }
+  });
+
+  const hexRgb = h => {
+    const n = parseInt(h.replace("#", ""), 16);
+    return PDFLib.rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+  };
+
+  async function buildAnnotatedPdf() {
+    const { PDFDocument, StandardFonts, degrees, rgb } = PDFLib;
+    const doc = await PDFDocument.load(project.bytes.slice(), { ignoreEncryption: true });
+    const font = await doc.embedFont(StandardFonts.HelveticaBold);
+    const pages = doc.getPages();
+    const VIOLET = "#4C1D95", RJC = "#007A33";
+
+    // Outils de dessin pour une page, en coordonnées « fraction de page »
+    const ctx = n => {
+      const pg = pages[n - 1], vp = pageViews[n - 1].page.getViewport({ scale: 1 });
+      const W = vp.width, H = vp.height, u = Math.max(W, H) / 800;
+      const rot = pg.getRotation().angle || 0;
+      const P = (x, y) => { const [px, py] = vp.convertToPdfPoint(x * W, y * H); return { x: px, y: py }; };
+      // décalage en unités d'affichage (dx, dy en points vers la droite / le bas)
+      const PO = (x, y, dx, dy) => P(x + dx / W, y + dy / H);
+      return {
+        u, W, H,
+        poly(pts, color, dash) {
+          for (let i = 1; i < pts.length; i++)
+            pg.drawLine({ start: P(pts[i - 1].x, pts[i - 1].y), end: P(pts[i].x, pts[i].y),
+              thickness: 1.6 * u, color: hexRgb(color), dashArray: dash ? [5 * u, 3 * u] : undefined, lineCap: 1 });
+        },
+        dot(p, color, square) {
+          const c = P(p.x, p.y), r = 3 * u;
+          if (square) pg.drawRectangle({ x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r, color: hexRgb(color), borderColor: rgb(1, 1, 1), borderWidth: .8 * u });
+          else pg.drawCircle({ x: c.x, y: c.y, size: r, color: hexRgb(color), borderColor: rgb(1, 1, 1), borderWidth: .8 * u });
+        },
+        label(p, text, color, dx) {
+          const size = 7 * u;
+          text = String(text).replace(/[\u202F\u00A0]/g, " "); // espaces fines non encodables en WinAnsi
+          const at = PO(p.x, p.y, (dx || 6) * u, 2.5 * u);
+          const w = font.widthOfTextAtSize(text, size);
+          const bg = PO(p.x, p.y, (dx || 6) * u - 1.5 * u, 3.5 * u); // coin bas-gauche du texte
+          // fond blanc pour la lisibilité (dessiné dans l'orientation d'affichage)
+          pg.drawRectangle({ x: bg.x, y: bg.y, width: w + 3 * u, height: size + 2 * u, color: rgb(1, 1, 1), opacity: .85, rotate: degrees(rot) });
+          pg.drawText(text, { x: at.x, y: at.y, size, font, color: hexRgb(color), rotate: degrees(rot) });
+        },
+        box(b) {
+          const s = 6 * u, c = { x: +b.dataset.x, y: +b.dataset.y };
+          const A = PO(c.x, c.y, -s, -s), B = PO(c.x, c.y, s, -s), C = PO(c.x, c.y, s, s), D = PO(c.x, c.y, -s, s);
+          const col = hexRgb(VIOLET), t = 1.4 * u;
+          // une rotation de page (0/90/180/270) garde le carré aligné sur les axes
+          const xs = [A, B, C, D].map(q => q.x), ys = [A, B, C, D].map(q => q.y);
+          pg.drawRectangle({ x: Math.min(...xs), y: Math.min(...ys), width: 2 * s, height: 2 * s,
+            color: rgb(1, 1, 1), borderColor: col, borderWidth: t });
+          pg.drawLine({ start: A, end: C, thickness: t, color: col });
+          pg.drawLine({ start: B, end: D, thickness: t, color: col });
+          this.label(c, b.dataset.label, VIOLET, s + 3 * u);
+        }
+      };
+    };
+
+    // Lignes rattachées aux boîtes, puis les boîtes par-dessus
+    const boxes = [...boxInfo.keys()].filter(b => b.isConnected);
+    boxes.forEach(b => {
+      const c = ctx(+b.dataset.page), origin = { x: +b.dataset.x, y: +b.dataset.y };
+      boxInfo.get(b).lines.forEach(l => {
+        if (!l.points.length || (drawing && drawing.line === l)) return;
+        const color = l.kind === "td" ? VIOLET : CIRCUIT_COLORS[l.circuit];
+        c.poly([origin, ...l.points], color);
+        const end = l.points[l.points.length - 1];
+        c.dot(end, color, l.kind === "der");
+        if (l.section) c.label(end, l.section, color);
+      });
+    });
+    // Lignes libres : RJ45 et mesures
+    rjLines.filter(l => l.el.isConnected).forEach(l => {
+      const c = ctx(l.pageNum), mes = l.kind === "mes", color = mes ? l.color : RJC;
+      c.poly(l.points, color, mes);
+      const end = l.points[l.points.length - 1];
+      c.dot(end, color);
+      c.label(end, lineLabel(l), color);
+    });
+    boxes.forEach(b => ctx(+b.dataset.page).box(b));
+
+    return doc.save();
+  }
+
+  // ---- Retour à l'accueil ----
+  function goHome() {
+    $("homePop").hidden = true;
+    xOpen(false); closeContext();
+    clearAnnotations();
+    if (pdfDoc) { pdfDoc.destroy(); pdfDoc = null; }
+    renderToken++;
+    pageViews.length = 0; pagesEl.innerHTML = "";
+    project = null; dirty = false;
+    setSaveState(""); $("saveState").classList.remove("dirty");
+    app.hidden = true; welcome.hidden = false;
+    errorBox.textContent = "";
+    document.title = "Visionneuse PDF";
+    window.scrollTo(0, 0);
+    renderSaved();
+  }
+  $("homeBtn").addEventListener("click", () => {
+    if (!dirty) { goHome(); return; }
+    $("homePop").hidden = !$("homePop").hidden;
+  });
+  $("homeSave").addEventListener("click", async () => { await saveNow(); if (!dirty) goHome(); });
+  $("homeLeave").addEventListener("click", goHome);
+  $("homeCancel").addEventListener("click", () => { $("homePop").hidden = true; });
+  document.addEventListener("pointerdown", e => {
+    if (!$("homePop").hidden && !e.target.closest(".home")) $("homePop").hidden = true;
+  }, true);
+
+  // Liste des travaux enregistrés sur l'écran d'accueil
+  async function renderSaved() {
+    const items = (await idbAll("projects")).sort((a, b) => b.updatedAt - a.updatedAt);
+    const list = $("savedList");
+    list.innerHTML = "";
+    $("saved").hidden = !items.length;
+    items.forEach(it => {
+      const li = document.createElement("li");
+      const meta = document.createElement("div"); meta.className = "meta";
+      const nm = document.createElement("div"); nm.className = "name"; nm.textContent = it.name;
+      const dt = document.createElement("div"); dt.className = "date";
+      const n = (it.state.boxes || []).length;
+      dt.textContent = "Enregistré le " + new Date(it.updatedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })
+        + " · " + n + (n > 1 ? " boîtes" : " boîte");
+      meta.append(nm, dt);
+      const go = document.createElement("button"); go.className = "resume"; go.textContent = "Reprendre";
+      go.addEventListener("click", async () => {
+        const f = await idbGet("files", it.id);
+        if (!f) { errorBox.textContent = "Le PDF de ce travail n'est plus disponible. Importez-le à nouveau : vos annotations seront restaurées."; return; }
+        openBytes(it.name, new Uint8Array(f.bytes), it);
+      });
+      const del = document.createElement("button"); del.className = "forget"; del.textContent = "Supprimer";
+      del.addEventListener("click", async () => {
+        if (!del.classList.contains("confirm")) { del.classList.add("confirm"); del.textContent = "Confirmer"; return; }
+        await idbDel("projects", it.id).catch(() => {}); await idbDel("files", it.id).catch(() => {});
+        renderSaved();
+      });
+      li.append(meta, go, del);
+      list.appendChild(li);
+    });
+  }
+  renderSaved();
+
+  // ---- Fenêtre Calcul ----
+  // Les longueurs sont calculées en points PDF (taille réelle de la page),
+  // puis converties en mètres avec l'échelle issue de la première mesure.
+  let metersPerPt = null, meas = null, calcQueued = false;
+  const fmt = n => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function placeCalc() {
+    document.documentElement.style.setProperty("--calc-top", ($("bars").getBoundingClientRect().bottom + 12) + "px");
+  }
+  window.addEventListener("resize", placeCalc);
+  $("calcToggle").addEventListener("click", () => {
+    const c = $("calc").classList.toggle("collapsed");
+    $("calcToggle").setAttribute("aria-expanded", !c);
+    $("calcToggle").setAttribute("aria-label", c ? "Agrandir la fenêtre" : "Réduire la fenêtre");
+    $("calcToggle").innerHTML = c
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg>';
+  });
+
+  function pageSizePt(n) {
+    const vp = pageViews[n - 1].page.getViewport({ scale: 1 });
+    return [vp.width, vp.height];
+  }
+  function polyLengthPt(pageNum, pts) {
+    const [W, H] = pageSizePt(pageNum);
+    let len = 0;
+    for (let i = 1; i < pts.length; i++)
+      len += Math.hypot((pts[i].x - pts[i - 1].x) * W, (pts[i].y - pts[i - 1].y) * H);
+    return len;
+  }
+
+  function resetCalc() {
+    metersPerPt = null; clearMeasure();
+    refreshMesLabels();
+    $("calcSetup").hidden = false; $("calcResults").hidden = true;
+    $("measureBtn").hidden = false; $("measureInput").hidden = true;
+  }
+
+  function clearMeasure() {
+    if (meas) { meas.svgLine && meas.svgLine.remove(); meas.dots.forEach(d => d.remove()); }
+    meas = null;
+  }
+
+  $("measureBtn").addEventListener("click", () => {
+    clearMeasure(); setMode(null); select(null);
+    meas = { stage: 1, dots: [] };
+    setMode("measure");
+  });
+  $("measureRedo").addEventListener("click", () => { resetCalc(); $("measureBtn").click(); });
+  $("measureCancel").addEventListener("click", () => { resetCalc(); $("measureBtn").click(); });
+
+  function measureClick(overlay, pageNum, x, y) {
+    if (!meas) return;
+    if (meas.stage === 1) {
+      const svg = getSvg(overlay);
+      const l = document.createElementNS(SVGNS, "line");
+      l.setAttribute("class", "measure-line");
+      l.setAttribute("vector-effect", "non-scaling-stroke");
+      ["x1", "x2"].forEach(a => l.setAttribute(a, x)); ["y1", "y2"].forEach(a => l.setAttribute(a, y));
+      svg.appendChild(l);
+      Object.assign(meas, { stage: 2, overlay, pageNum, p1: { x, y }, svgLine: l });
+      meas.dots.push(measureDot(overlay, x, y));
+      $("hint").textContent = "Cliquez sur la fin du segment de référence. Échap pour annuler.";
+    } else if (meas.stage === 2) {
+      if (overlay !== meas.overlay) { $("hint").textContent = "La fin du segment doit être sur la même page."; return; }
+      meas.p2 = { x, y }; meas.stage = 3;
+      meas.svgLine.setAttribute("x2", x); meas.svgLine.setAttribute("y2", y);
+      meas.dots.push(measureDot(overlay, x, y));
+      meas.lengthPt = polyLengthPt(meas.pageNum, [meas.p1, meas.p2]);
+      setMode(null);
+      $("measureBtn").hidden = true; $("measureInput").hidden = false;
+      $("calc").classList.remove("collapsed");
+      $("measureValue").value = ""; $("measureValue").focus();
+    }
+  }
+
+  function measureDot(overlay, x, y) {
+    const d = document.createElement("div");
+    d.className = "measure-dot";
+    d.style.left = (x * 100) + "%"; d.style.top = (y * 100) + "%";
+    overlay.appendChild(d);
+    return d;
+  }
+
+  function measurePreview(e, overlay) {
+    if (!meas || meas.stage !== 2 || overlay !== meas.overlay) return;
+    const r = overlay.getBoundingClientRect();
+    meas.svgLine.setAttribute("x2", (e.clientX - r.left) / r.width);
+    meas.svgLine.setAttribute("y2", (e.clientY - r.top) / r.height);
+  }
+
+  function validateMeasure() {
+    const v = parseFloat(String($("measureValue").value).replace(",", "."));
+    if (!meas || meas.stage !== 3) return;
+    if (!(v > 0)) { $("measureValue").focus(); return; }
+    if (meas.lengthPt < 1) { resetCalc(); return; }
+    metersPerPt = v / meas.lengthPt;
+    scaleValue = v;
+    clearMeasure();
+    $("calcSetup").hidden = true; $("calcResults").hidden = false;
+    refreshMesLabels();
+    $("scaleInfo").textContent = "Échelle définie par un segment de " + fmt(v) + " m.";
+    updateCalc(true);
+  }
+  $("measureOk").addEventListener("click", validateMeasure);
+  $("measureValue").addEventListener("keydown", e => { if (e.key === "Enter") validateMeasure(); });
+
+  // Regroupe les mises à jour (pendant un glisser, une seule par image)
+  function updateCalc(now) {
+    if (metersPerPt === null) return;
+    if (now === true) return renderCalc();
+    if (calcQueued) return;
+    calcQueued = true;
+    requestAnimationFrame(() => { calcQueued = false; renderCalc(); });
+  }
+
+  function renderCalc() {
+    const list = $("calcList");
+    list.innerHTML = "";
+    const boxes = [...boxInfo.keys()].filter(b => b.isConnected)
+      .sort((a, b) => parseInt(a.dataset.label.slice(2)) - parseInt(b.dataset.label.slice(2)));
+    renderRj();
+    if (!boxes.length) {
+      list.innerHTML = '<li class="none">Aucune boîte de dérivation sur le plan.</li>';
+      renderDer([]);
+      return;
+    }
+    boxes.forEach(b => {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.className = "bd"; name.textContent = b.dataset.label;
+      const val = document.createElement("span");
+      const td = boxInfo.get(b).lines.find(l => l.kind === "td" && l.points.length);
+      if (td) {
+        const m = polyLengthPt(+b.dataset.page, [{ x: +b.dataset.x, y: +b.dataset.y }, ...td.points]) * metersPerPt + tdExtra();
+        val.className = "len"; val.textContent = fmt(m) + " m";
+      } else {
+        val.className = "none"; val.textContent = "pas de ligne vers TD";
+      }
+      li.append(name, val);
+      list.appendChild(li);
+    });
+    renderDer(boxes);
+  }
+
+  // Somme des lignes de dérivation par catégorie (ALIM détaillé par section)
+  const tdExtra = () => {
+    const v = parseFloat(String($("tdExtra").value).replace(",", "."));
+    return v > 0 ? v : 0;
+  };
+  $("tdExtra").addEventListener("input", () => updateCalc(true));
+
+  // Total des lignes RJ45 : longueur mesurée + forfait par ligne
+  const RJ_EXTRA = 5;
+  function renderRj() {
+    const list = $("rjList");
+    list.innerHTML = "";
+    const lines = rjLines.filter(l => l.kind === "rj" && l.el.isConnected);
+    if (!lines.length) {
+      list.innerHTML = '<li class="none">Aucune ligne RJ45 sur le plan.</li>';
+      return;
+    }
+    ["1x4P", "2x4P"].forEach(v => {
+      const group = lines.filter(l => l.variant === v);
+      if (!group.length) return;
+      const total = group.reduce((t, l) => t + polyLengthPt(l.pageNum, l.points) * metersPerPt + RJ_EXTRA, 0);
+      const li = document.createElement("li");
+      li.innerHTML = '<span class="cat"><i style="--c:#007A33"></i>' + v + ' (' + group.length +
+        (group.length > 1 ? " lignes" : " ligne") + ')</span><span class="len">' + fmt(total) + " m</span>";
+      list.appendChild(li);
+    });
+  }
+
+  // Longueur forfaitaire ajoutée à chaque ligne (en mètres)
+  const DER_EXTRA = { PC: 3, ECL: 1 };
+  const DER_ORDER = ["ECL", "BAES", "PC", "ALIM 3G1.5", "ALIM 3G2.5", "ALIM 3G6", "ALIM 5G1.5", "ALIM 5G2.5"];
+  function renderDer(boxes) {
+    const list = $("derList");
+    list.innerHTML = "";
+    const sums = {};
+    boxes.forEach(b => {
+      const origin = { x: +b.dataset.x, y: +b.dataset.y };
+      boxInfo.get(b).lines.forEach(l => {
+        if (l.kind !== "der" || !l.points.length) return;
+        const key = l.circuit === "ALIM" ? "ALIM " + l.section : l.circuit;
+        sums[key] = (sums[key] || 0) + polyLengthPt(+b.dataset.page, [origin, ...l.points]) * metersPerPt
+          + (DER_EXTRA[l.circuit] || 0);
+      });
+    });
+    const keys = DER_ORDER.filter(k => k in sums);
+    if (!keys.length) {
+      list.innerHTML = '<li class="none">Aucune ligne de dérivation sur le plan.</li>';
+      return;
+    }
+    keys.forEach(k => {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.className = "cat";
+      const sw = document.createElement("i");
+      sw.style.setProperty("--c", CIRCUIT_COLORS[k.split(" ")[0]]);
+      name.append(sw, document.createTextNode(k));
+      const val = document.createElement("span");
+      val.className = "len"; val.textContent = fmt(sums[k]) + " m";
+      li.append(name, val);
+      list.appendChild(li);
+    });
+  }
+
+  $("prev").addEventListener("click", () => goTo(current - 1));
+  $("next").addEventListener("click", () => goTo(current + 1));
+  $("pageInput").addEventListener("change", e => {
+    const n = parseInt(e.target.value, 10);
+    if (!isNaN(n)) goTo(n); else updateUi();
+  });
+  $("pageInput").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
+  $("zoomIn").addEventListener("click", () => setScale(scale * 1.2));
+  $("zoomOut").addEventListener("click", () => setScale(scale / 1.2));
+  $("fit").addEventListener("click", () => pageViews[0] && setScale(fitScale(pageViews[0].page)));
+
+  document.addEventListener("keydown", e => {
+    if (!pdfDoc || app.hidden || /^(INPUT|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); goTo(current + 1); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); goTo(current - 1); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "=")) { e.preventDefault(); setScale(scale * 1.2); }
+    if ((e.ctrlKey || e.metaKey) && e.key === "-") { e.preventDefault(); setScale(scale / 1.2); }
+  });
+})();
+</script>
+</body>
+</html>
